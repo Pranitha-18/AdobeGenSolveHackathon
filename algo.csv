@@ -1,0 +1,110 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Function to detect irregularities in the dataset
+def detect_irregularities(XY):
+    # Check if the shape is regular (e.g., polygon, ellipse, etc.)
+    shape_type = identify_shape(XY)
+    return shape_type
+
+# Function to identify the type of shape
+def identify_shape(XY):
+    if is_straight_line(XY):
+        return 'Straight Line'
+    elif is_circle_or_ellipse(XY):
+        return 'Circle/Ellipse'
+    elif is_rectangle(XY):
+        return 'Rectangle'
+    elif is_polygon(XY):
+        return 'Polygon'
+    else:
+        return 'Irregular Shape'
+
+# Function to check if points form a straight line
+def is_straight_line(XY):
+    if len(XY) < 2:
+        return False
+    return np.allclose(XY[:, 0], XY[:, 0][0]) or np.allclose(XY[:, 1], XY[:, 1][0])
+
+# Function to check if points form a circle or ellipse
+def is_circle_or_ellipse(XY):
+    center = np.mean(XY, axis=0)
+    radii = np.linalg.norm(XY - center, axis=1)
+    return np.std(radii) / np.mean(radii) < 0.1
+
+# Function to check if points form a rectangle
+def is_rectangle(XY):
+    if len(XY) != 4:
+        return False
+    dists = np.linalg.norm(np.diff(XY, axis=0), axis=1)
+    diag_dists = np.linalg.norm(XY[2] - XY[0]) + np.linalg.norm(XY[3] - XY[1])
+    return np.allclose(dists[::2], dists[1::2]) and np.isclose(diag_dists, np.linalg.norm(XY[1] - XY[3]))
+
+# Function to check if points form a polygon
+def is_polygon(XY):
+    return len(XY) > 4
+
+# Function to correct irregular shapes without resizing
+def correct_shape(XY, shape_type):
+    if shape_type == 'Straight Line':
+        XY[:, 1] = np.mean(XY[:, 1])  # Make it a straight horizontal line
+    elif shape_type == 'Circle/Ellipse':
+        center = np.mean(XY, axis=0)
+        radius = np.mean(np.linalg.norm(XY - center, axis=1))
+        angles = np.linspace(0, 2 * np.pi, len(XY))
+        XY[:, 0] = center[0] + radius * np.cos(angles)
+        XY[:, 1] = center[1] + radius * np.sin(angles)
+    elif shape_type == 'Rectangle':
+        XY = np.array([[XY[:, 0].min(), XY[:, 1].min()],
+                       [XY[:, 0].max(), XY[:, 1].min()],
+                       [XY[:, 0].max(), XY[:, 1].max()],
+                       [XY[:, 0].min(), XY[:, 1].max()]])
+    elif shape_type == 'Polygon':
+        XY = XY[np.lexsort((XY[:, 1], XY[:, 0]))]  # Sort points to correct polygon irregularity
+    
+    return XY
+
+# Function to plot original and corrected shapes
+def plot_shapes(original_XY, corrected_XY, shape_type):
+    plt.figure(figsize=(6, 6))
+    plt.plot(original_XY[:, 0], original_XY[:, 1], 'ro-', label='Original Shape')
+    plt.legend()
+    plt.title('Original Shape')
+    plt.show()
+
+    plt.figure(figsize=(6, 6))
+    plt.plot(corrected_XY[:, 0], corrected_XY[:, 1], 'bo-', label=f'Corrected Shape: {shape_type}')
+    plt.legend()
+    plt.title(f'Corrected Shape: {shape_type}')
+    plt.show()
+
+# Function to save the plots as images
+def save_plot_shapes(original_XY, corrected_XY, shape_type, output_file):
+    plt.figure(figsize=(6, 6))
+    plt.plot(original_XY[:, 0], original_XY[:, 1], 'ro-', label='Original Shape')
+    plt.legend()
+    plt.title('Original Shape')
+    plt.savefig(f'{output_file}_original.png')  # Save the original shape image
+
+    plt.figure(figsize=(6, 6))
+    plt.plot(corrected_XY[:, 0], corrected_XY[:, 1], 'bo-', label=f'Corrected Shape: {shape_type}')
+    plt.legend()
+    plt.title(f'Corrected Shape: {shape_type}')
+    plt.savefig(f'{output_file}_corrected.png')  # Save the corrected shape image
+
+# Function to process the dataset
+def process_dataset(file_path, output_file):
+    data = np.genfromtxt(file_path, delimiter=',')
+    XY = data.reshape(-1, 2)  # Reshape the data if needed
+
+    # Detect irregularities and correct the shape
+    shape_type = detect_irregularities(XY)
+    corrected_XY = correct_shape(XY, shape_type)
+
+    # Save the plots as images
+    save_plot_shapes(XY, corrected_XY, shape_type, output_file)
+
+# Example usage
+file_path = 'frag1.csv'  # Replace with the actual path to your dataset
+output_file = 'output_shapes'  # Name of the output image files
+process_dataset(file_path, output_file)
